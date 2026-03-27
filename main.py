@@ -11,6 +11,7 @@ For scheduled runs, use the scheduler (coming in Phase 2).
 """
 
 from data_ingestion.news_fetcher import fetch_all_risk_news
+from processing.risk_scorer import score_all_articles, print_scored_articles
 
 
 def run_pipeline():
@@ -24,9 +25,9 @@ def run_pipeline():
     print(f"      → {len(articles)} articles ingested")
 
     # ── Phase 2: Score ───────────────────────────────────────
-    # Coming next: risk_scorer.py
     print("\n[2/5] Scoring disruption risk...")
-    print("      → [Not built yet — coming next session]")
+    scored_articles = score_all_articles(articles)
+    print_scored_articles(scored_articles, top_n=5)
 
     # ── Phase 3: Anomaly Detection ───────────────────────────
     print("\n[3/5] Running anomaly detection...")
@@ -47,6 +48,3 @@ def run_pipeline():
 
 if __name__ == "__main__":
     run_pipeline()
-
-
-#Check if the script is being run directly (instead of imported as a module) and execute the pipeline.
