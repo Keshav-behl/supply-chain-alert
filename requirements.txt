@@ -1,0 +1,30 @@
+# Supply Chain Alert — Python Dependencies
+# Install with: pip install -r requirements.txt
+# Compatible with Python 3.13+
+
+# ── Core ──────────────────────────────────────
+requests>=2.32.0
+python-dotenv>=1.0.1
+schedule>=1.2.2                 # Lightweight job scheduler
+
+# ── Data & ML ─────────────────────────────────
+pandas>=2.2.0                   # 2.2+ has Python 3.13 wheels
+scikit-learn>=1.5.0             # 1.5+ supports Python 3.13
+numpy>=2.0.0                    # numpy 2.x required for Python 3.13
+
+# ── Database ──────────────────────────────────
+supabase>=2.4.0
+
+# ── WhatsApp / Twilio ─────────────────────────
+twilio>=9.0.0
+
+# ── LLM ───────────────────────────────────────
+anthropic>=0.25.0
+
+# ── Dashboard ─────────────────────────────────
+streamlit>=1.35.0
+plotly>=5.22.0
+
+# ── Utilities ─────────────────────────────────
+apscheduler>=3.10.4             # Advanced scheduler for production
+python-dateutil>=2.9.0
