@@ -6,7 +6,7 @@ Scores each news article for supply chain disruption risk.
 Scoring Formula:
     Risk Score = Severity x Proximity x Sector Relevance
     Max Score  = 5 x 3 x 3 = 45
-    Alert Threshold = 25 (configurable in .env)
+    Alert Threshold = 20 (configurable in .env)
 
 Three scoring axes:
     1. Severity       — how bad is the disruption? (1-5)

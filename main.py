@@ -6,12 +6,15 @@ Run this file to execute one full pipeline cycle manually.
 
 Usage:
     python main.py
-
-For scheduled runs, use the scheduler (coming in Phase 2).
 """
+
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from data_ingestion.news_fetcher import fetch_all_risk_news
 from processing.risk_scorer import score_all_articles, print_scored_articles
+from processing.anomaly_detector import run_anomaly_detection
 
 
 def run_pipeline():
@@ -31,7 +34,8 @@ def run_pipeline():
 
     # ── Phase 3: Anomaly Detection ───────────────────────────
     print("\n[3/5] Running anomaly detection...")
-    print("      → [Not built yet]")
+    detection = run_anomaly_detection(scored_articles)
+    print(f"      → Should act: {detection['should_act']}")
 
     # ── Phase 4: Inventory Check ─────────────────────────────
     print("\n[4/5] Checking inventory buffers...")
