@@ -47,3 +47,6 @@ def run_pipeline():
 
 if __name__ == "__main__":
     run_pipeline()
+
+
+#Check if the script is being run directly (instead of imported as a module) and execute the pipeline.
