@@ -13,6 +13,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from data_ingestion.news_fetcher import fetch_all_risk_news
+from data_ingestion.weather_fetcher import fetch_all_weather_risks, get_weather_risk_articles
 from processing.risk_scorer import score_all_articles, print_scored_articles
 from processing.anomaly_detector import run_anomaly_detection
 from inventory.inventory_manager import load_inventory
@@ -31,13 +32,24 @@ def run_pipeline():
     print("═"*60)
 
     # ── Phase 1: Ingest ──────────────────────────────────────
-    print("\n[1/5] Fetching risk news...")
+    print("\n[1/5] Fetching risk data...")
+
+    # News articles
     articles = fetch_all_risk_news()
-    print(f"      → {len(articles)} articles ingested")
+    print(f"      → {len(articles)} news articles ingested")
+
+    # Weather signals — converted to article format for unified scoring
+    weather_assessments  = fetch_all_weather_risks()
+    weather_articles     = get_weather_risk_articles(weather_assessments)
+    print(f"      → {len(weather_articles)} weather risk signals detected")
+
+    # Merge news + weather into single pipeline
+    all_articles = articles + weather_articles
+    print(f"      → {len(all_articles)} total signals for scoring")
 
     # ── Phase 2: Score ───────────────────────────────────────
     print("\n[2/5] Scoring disruption risk...")
-    scored_articles = score_all_articles(articles)
+    scored_articles = score_all_articles(all_articles)
     print_scored_articles(scored_articles, top_n=5)
 
     # ── Phase 3: Anomaly Detection ───────────────────────────
@@ -47,7 +59,7 @@ def run_pipeline():
 
     # ── Phase 4: Inventory Check ─────────────────────────────
     print("\n[4/5] Checking inventory buffers...")
-    inventory = load_inventory()
+    inventory        = load_inventory()
     inventory_result = run_inventory_check(inventory, scored_articles, detection)
     print(f"      → {inventory_result['summary']}")
 
@@ -57,18 +69,15 @@ def run_pipeline():
     if not inventory_result["action_required"]:
         print("      → No vendor action needed right now")
     else:
-        # Load vendor registry
-        registry      = load_vendor_registry()
-        all_rfqs      = []
+        registry         = load_vendor_registry()
+        all_rfqs         = []
         action_materials = [
             m for m in inventory_result["at_risk_materials"]
             if m["needs_vendor_action"]
         ]
 
-        # Generate RFQs for each at-risk material
         for material in action_materials:
             vendors = get_top_vendors(registry, material["material"], top_n=3)
-
             if not vendors:
                 print(f"      → No vendors found for {material['material']}")
                 continue
@@ -80,7 +89,6 @@ def run_pipeline():
             )
             all_rfqs.extend(rfqs)
 
-        # Send via WhatsApp (dry run by default)
         run_vendor_outreach(
             at_risk_materials=action_materials,
             rfqs=all_rfqs,
