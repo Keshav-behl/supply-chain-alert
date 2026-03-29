@@ -142,29 +142,10 @@ python -m data_ingestion.news_fetcher
 
 ---
 
-## Build Roadmap
-
-- [x] Repo structure
-- [x] News fetcher
-- [ ] Weather fetcher
-- [ ] Port data scraper
-- [ ] Risk scorer
-- [ ] Anomaly detector
-- [ ] Inventory manager
-- [ ] Vendor registry
-- [ ] RFQ generator
-- [ ] WhatsApp outbound agent
-- [ ] Response parser
-- [ ] Owner approval flow
-- [ ] Streamlit dashboard
-- [ ] Deployment on Railway
-
----
-
 ## Built For
 
-IIMA AI Summer Residency 2025 — solving real Indian manufacturing problems with AI-native tooling.
+IIMA AI Summer Residency 2026 — solving real Indian manufacturing problems with AI-native tooling.
 
 ---
 
-*Built by [Your Name]*
+*Built by Keshav Behl*
