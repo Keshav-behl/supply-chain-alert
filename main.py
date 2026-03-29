@@ -15,6 +15,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from data_ingestion.news_fetcher import fetch_all_risk_news
 from processing.risk_scorer import score_all_articles, print_scored_articles
 from processing.anomaly_detector import run_anomaly_detection
+from inventory.inventory_manager import load_inventory
+from inventory.threshold_checker import run_inventory_check
 
 
 def run_pipeline():
@@ -39,11 +41,16 @@ def run_pipeline():
 
     # ── Phase 4: Inventory Check ─────────────────────────────
     print("\n[4/5] Checking inventory buffers...")
-    print("      → [Not built yet]")
+    inventory = load_inventory()
+    inventory_result = run_inventory_check(inventory, scored_articles, detection)
+    print(f"      → {inventory_result['summary']}")
 
     # ── Phase 5: Vendor Agent ────────────────────────────────
     print("\n[5/5] Contacting backup vendors if needed...")
-    print("      → [Not built yet]")
+    if inventory_result["action_required"]:
+        print("      → Action required — vendor agent coming next build")
+    else:
+        print("      → No vendor action needed right now")
 
     print("\n" + "═"*60)
     print("  Pipeline run complete.")
