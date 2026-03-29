@@ -1,0 +1,9 @@
+material,current_stock_days,minimum_safe_days,supplier_state,unit,monthly_usage
+steel,45,30,Gujarat,tons,12
+aluminium,22,30,Maharashtra,tons,8
+coal,60,30,Jharkhand,tons,25
+diesel,15,30,Punjab,liters,5000
+cotton,35,30,Gujarat,kg,800
+polymer,18,30,Gujarat,kg,400
+copper,50,30,Tamil Nadu,kg,150
+cement,28,30,Rajasthan,bags,200
