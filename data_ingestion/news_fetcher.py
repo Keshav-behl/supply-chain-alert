@@ -12,7 +12,7 @@ Setup:
 
 import os
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,8 +24,23 @@ load_dotenv()
 NEWSAPI_KEY = os.getenv("NEWSAPI_KEY")
 NEWSAPI_URL = "https://newsapi.org/v2/everything"
 
+# Low quality / unreliable sources to ignore
+BLOCKED_SOURCES = [
+    "theeconomiccollapseblog.com",
+    "newsbreakapp.com",
+    "beforeitsnews.com",
+    "zerohedge.com",
+    "naturalnews.com",
+    "infowars.com",
+]
+
+# Blocked URLs (NewsAPI returns removed articles with this URL)
+BLOCKED_URLS = [
+    "https://removed.com",
+    "",
+]
+
 # Keywords that signal supply chain risk for Indian SME manufacturers
-# Expand this list as you learn more about your target users' supply chains
 RISK_KEYWORDS = [
     "port strike India",
     "port congestion Mumbai",
@@ -49,21 +64,60 @@ LOOKBACK_DAYS = 2
 
 
 # ─────────────────────────────────────────────
+# FILTERS
+# ─────────────────────────────────────────────
+
+def is_blocked_source(article: dict) -> bool:
+    """Returns True if article is from a blocked low-quality source."""
+    source_name = (article.get("source", {}).get("name") or "").lower()
+    source_id   = (article.get("source", {}).get("id")   or "").lower()
+    url         = (article.get("url") or "").lower()
+
+    for blocked in BLOCKED_SOURCES:
+        blocked = blocked.lower()
+        if blocked in source_name or blocked in source_id or blocked in url:
+            return True
+    return False
+
+
+def is_blocked_url(article: dict) -> bool:
+    """Returns True if article URL is in the blocked list."""
+    url = article.get("url", "").strip()
+    return url in BLOCKED_URLS or not url
+
+
+def is_valid_article(article: dict) -> bool:
+    """
+    Returns True if article passes all quality filters.
+    Filters out: blocked sources, removed articles, articles with no title.
+    """
+    if is_blocked_source(article):
+        return False
+    if is_blocked_url(article):
+        return False
+    if not article.get("title") or article.get("title") == "[Removed]":
+        return False
+    if not article.get("description"):
+        return False
+    return True
+
+
+# ─────────────────────────────────────────────
 # FETCHER
 # ─────────────────────────────────────────────
 
 def fetch_news_for_keyword(keyword: str, from_date: str) -> list[dict]:
     """
     Fetches articles from NewsAPI for a single keyword.
-    Returns a list of raw article dicts.
+    Applies quality filters before returning.
     """
     params = {
-        "q": keyword,
-        "from": from_date,
+        "q":        keyword,
+        "from":     from_date,
         "language": "en",
-        "sortBy": "relevancy",
-        "pageSize": 5,          # 5 articles per keyword — enough signal, saves API quota
-        "apiKey": NEWSAPI_KEY,
+        "sortBy":   "relevancy",
+        "pageSize": 5,
+        "apiKey":   NEWSAPI_KEY,
     }
 
     try:
@@ -72,12 +126,21 @@ def fetch_news_for_keyword(keyword: str, from_date: str) -> list[dict]:
         data = response.json()
 
         if data.get("status") != "ok":
-            print(f"  [WARN] NewsAPI returned non-ok status for '{keyword}': {data.get('message')}")
+            print(f"  [WARN] NewsAPI non-ok for '{keyword}': {data.get('message')}")
             return []
 
-        articles = data.get("articles", [])
-        print(f"  [OK] '{keyword}' → {len(articles)} articles found")
-        return articles
+        raw_articles = data.get("articles", [])
+
+        # Apply quality filter here
+        filtered = [a for a in raw_articles if is_valid_article(a)]
+        blocked  = len(raw_articles) - len(filtered)
+
+        if blocked > 0:
+            print(f"  [OK] '{keyword}' → {len(filtered)} articles ({blocked} blocked)")
+        else:
+            print(f"  [OK] '{keyword}' → {len(filtered)} articles found")
+
+        return filtered
 
     except requests.exceptions.RequestException as e:
         print(f"  [ERROR] Request failed for '{keyword}': {e}")
@@ -85,10 +148,7 @@ def fetch_news_for_keyword(keyword: str, from_date: str) -> list[dict]:
 
 
 def deduplicate_articles(articles: list[dict]) -> list[dict]:
-    """
-    Removes duplicate articles by URL.
-    Same story can appear under multiple keyword searches.
-    """
+    """Removes duplicate articles by URL."""
     seen_urls = set()
     unique = []
     for article in articles:
@@ -100,16 +160,13 @@ def deduplicate_articles(articles: list[dict]) -> list[dict]:
 
 
 def parse_article(raw: dict) -> dict:
-    """
-    Extracts only the fields we need from a raw NewsAPI article.
-    Keeps the data model clean for the risk scorer downstream.
-    """
+    """Extracts only the fields we need from a raw NewsAPI article."""
     return {
-        "title": raw.get("title", ""),
-        "description": raw.get("description", ""),
-        "url": raw.get("url", ""),
-        "source": raw.get("source", {}).get("name", "Unknown"),
-        "published_at": raw.get("publishedAt", ""),
+        "title":          raw.get("title", ""),
+        "description":    raw.get("description", ""),
+        "url":            raw.get("url", ""),
+        "source":         raw.get("source", {}).get("name", "Unknown"),
+        "published_at":   raw.get("publishedAt", ""),
         "content_snippet": raw.get("content", "")[:300] if raw.get("content") else "",
     }
 
@@ -117,10 +174,7 @@ def parse_article(raw: dict) -> dict:
 def fetch_all_risk_news() -> list[dict]:
     """
     Main function. Fetches news for all risk keywords,
-    deduplicates, parses, and returns clean article list.
-
-    Returns:
-        List of parsed article dicts ready for risk scoring.
+    filters low quality sources, deduplicates, and returns clean articles.
     """
     if not NEWSAPI_KEY:
         raise EnvironmentError(
@@ -128,7 +182,7 @@ def fetch_all_risk_news() -> list[dict]:
             "Get a free key at: https://newsapi.org/register"
         )
 
-    from_date = (datetime.utcnow() - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d")
+    from_date = (datetime.now(UTC) - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d")
     print(f"\n[NEWS FETCHER] Scanning {len(RISK_KEYWORDS)} keywords from {from_date}...\n")
 
     raw_articles = []
@@ -136,18 +190,15 @@ def fetch_all_risk_news() -> list[dict]:
         articles = fetch_news_for_keyword(keyword, from_date)
         raw_articles.extend(articles)
 
-    # Deduplicate before parsing
     unique_articles = deduplicate_articles(raw_articles)
     print(f"\n[NEWS FETCHER] {len(raw_articles)} total → {len(unique_articles)} unique articles after dedup\n")
 
-    # Parse to clean schema
     parsed = [parse_article(a) for a in unique_articles]
-
     return parsed
 
 
 # ─────────────────────────────────────────────
-# QUICK TEST — run this file directly to verify
+# QUICK TEST
 # ─────────────────────────────────────────────
 
 if __name__ == "__main__":
