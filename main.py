@@ -21,6 +21,7 @@ from inventory.threshold_checker import run_inventory_check
 from vendor_network.vendor_registry import load_vendor_registry, get_top_vendors
 from vendor_network.rfq_generator import generate_rfqs_for_material
 from whatsapp_agent.outbound_rfq import run_vendor_outreach
+from database.crud import save_full_pipeline_run
 
 # ── Set to False only when Twilio is fully configured ──────
 DRY_RUN = True
@@ -33,19 +34,11 @@ def run_pipeline():
 
     # ── Phase 1: Ingest ──────────────────────────────────────
     print("\n[1/5] Fetching risk data...")
-
-    # News articles
-    articles = fetch_all_risk_news()
-    print(f"      → {len(articles)} news articles ingested")
-
-    # Weather signals — converted to article format for unified scoring
+    articles             = fetch_all_risk_news()
     weather_assessments  = fetch_all_weather_risks()
     weather_articles     = get_weather_risk_articles(weather_assessments)
-    print(f"      → {len(weather_articles)} weather risk signals detected")
-
-    # Merge news + weather into single pipeline
-    all_articles = articles + weather_articles
-    print(f"      → {len(all_articles)} total signals for scoring")
+    all_articles         = articles + weather_articles
+    print(f"      → {len(articles)} news + {len(weather_articles)} weather = {len(all_articles)} total signals")
 
     # ── Phase 2: Score ───────────────────────────────────────
     print("\n[2/5] Scoring disruption risk...")
@@ -65,12 +58,12 @@ def run_pipeline():
 
     # ── Phase 5: Vendor Agent ────────────────────────────────
     print("\n[5/5] Running vendor agent...")
+    all_rfqs = []
 
     if not inventory_result["action_required"]:
         print("      → No vendor action needed right now")
     else:
         registry         = load_vendor_registry()
-        all_rfqs         = []
         action_materials = [
             m for m in inventory_result["at_risk_materials"]
             if m["needs_vendor_action"]
@@ -79,9 +72,7 @@ def run_pipeline():
         for material in action_materials:
             vendors = get_top_vendors(registry, material["material"], top_n=3)
             if not vendors:
-                print(f"      → No vendors found for {material['material']}")
                 continue
-
             rfqs = generate_rfqs_for_material(
                 vendors=vendors,
                 material=material,
@@ -94,8 +85,15 @@ def run_pipeline():
             rfqs=all_rfqs,
             dry_run=DRY_RUN,
         )
-
         print(f"\n      → {len(all_rfqs)} RFQs generated for {len(action_materials)} materials")
+
+    # ── Save to Database ─────────────────────────────────────
+    save_full_pipeline_run(
+        scored_articles=  scored_articles,
+        detection=        detection,
+        inventory_result= inventory_result,
+        rfqs=             all_rfqs,
+    )
 
     print("\n" + "═"*60)
     print("  Pipeline run complete.")
