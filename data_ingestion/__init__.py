@@ -1,2 +1,3 @@
 from .news_fetcher import fetch_all_risk_news
 from .weather_fetcher import fetch_all_weather_risks, get_weather_risk_articles
+from .port_fetcher import fetch_all_port_risks, get_port_risk_articles
